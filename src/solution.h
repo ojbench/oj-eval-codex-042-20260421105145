@@ -85,7 +85,7 @@ private:
         Node* cur = head;
         for (int k = fast_search_list_size - 1; k >= 0; --k) {
             Node* nxt = (cur && cur->fast_search_list) ? cur->fast_search_list[k] : nullptr;
-            if (nxt && nxt->idx != 0 && nxt->bound < code) {
+            if (nxt && nxt->idx > cur->idx && nxt->bound < code) {
                 cur = nxt;
             }
         }
