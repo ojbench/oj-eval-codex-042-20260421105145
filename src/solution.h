@@ -25,6 +25,7 @@ public:
         int bound = 0;
         Node* next = nullptr;
         Node** fast_search_list = nullptr;
+        int idx = -1; // position starting from head
 
         Node(int bound_in, int fast_search_list_size) : bound(bound_in) {
             if (fast_search_list_size > 0) {
@@ -57,8 +58,7 @@ private:
     }
 
     void BuildFastSearchList() {
-        if (list_size <= 0 || !head) return;
-        // Simple jump table: fast_search_list[k] = 2^k successor
+        if (list_size <= 0 || !head || fast_search_list_size <= 0) return;
         std::vector<Node*> nodes;
         nodes.reserve(list_size);
         Node* cur = head;
@@ -66,12 +66,30 @@ private:
             nodes.push_back(cur);
             cur = cur->next;
         }
+        // k=0: direct successor
         for (int i = 0; i < list_size; ++i) {
-            for (int k = 0; k < fast_search_list_size; ++k) {
-                int idx = (i + (1 << k)) % list_size;
-                nodes[i]->fast_search_list[k] = nodes[idx];
+            nodes[i]->fast_search_list[0] = nodes[(i + 1) % list_size];
+        }
+        // k>0: doubling
+        for (int k = 1; k < fast_search_list_size; ++k) {
+            for (int i = 0; i < list_size; ++i) {
+                Node* half = nodes[i]->fast_search_list[k - 1];
+                nodes[i]->fast_search_list[k] = half ? half->fast_search_list[k - 1] : nullptr;
             }
         }
+    }
+
+    Node* FindNodeForCode(int code) const {
+        if (!head) return nullptr;
+        if (code <= head->bound) return head;
+        Node* cur = head;
+        for (int k = fast_search_list_size - 1; k >= 0; --k) {
+            Node* nxt = (cur && cur->fast_search_list) ? cur->fast_search_list[k] : nullptr;
+            if (nxt && nxt->idx != 0 && nxt->bound < code) {
+                cur = nxt;
+            }
+        }
+        return cur->next;
     }
 
 public:
@@ -85,9 +103,11 @@ public:
         fast_search_list_size = std::max(0, log2(std::max(1, list_size)));
         // Create nodes in increasing bound order
         head = new Node(node_bounds[0], fast_search_list_size);
+        head->idx = 0;
         Node* prev = head;
         for (int i = 1; i < list_size; ++i) {
             Node* node = new Node(node_bounds[i], fast_search_list_size);
+            node->idx = i;
             prev->next = node;
             prev = node;
         }
@@ -111,37 +131,18 @@ public:
     void put(std::string str, T value) {
         int code = GetHashCode(str);
         if (!head) return;
-        // If code <= head bound, store at head
-        if (code <= head->bound) {
-            head->kv_map[str] = value;
-            return;
-        }
-        // Simple linear traversal: find first bound >= code starting from head->next
-        Node* cur = head->next;
-        while (cur != head && cur->bound < code) cur = cur->next;
-        if (cur->bound >= code) {
-            cur->kv_map[str] = value;
-        } else {
-            // Should not happen since code < b_prime == max bound, but fallback to head
-            head->kv_map[str] = value;
-        }
+        Node* target = FindNodeForCode(code);
+        if (!target) return;
+        target->kv_map[str] = value;
     }
 
     T get(std::string str) {
         int code = GetHashCode(str);
         if (!head) return T();
-        if (code <= head->bound) {
-            auto it = head->kv_map.find(str);
-            if (it != head->kv_map.end()) return it->second;
-            return T();
-        }
-        Node* cur = head->next;
-        while (cur != head && cur->bound < code) cur = cur->next;
-        if (cur->bound >= code) {
-            auto it = cur->kv_map.find(str);
-            if (it != cur->kv_map.end()) return it->second;
-            return T();
-        }
+        Node* target = FindNodeForCode(code);
+        if (!target) return T();
+        auto it = target->kv_map.find(str);
+        if (it != target->kv_map.end()) return it->second;
         return T();
     }
 
