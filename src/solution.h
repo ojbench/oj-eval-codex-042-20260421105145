@@ -98,15 +98,12 @@ public:
 
     ~SpeedCircularLinkedList() {
         if (!head || list_size == 0) return;
-        // Break the cycle to safely delete
-        Node* cur = head->next;
-        head->next = nullptr;
-        while (cur) {
+        Node* cur = head;
+        for (int i = 0; i < list_size; ++i) {
             Node* nxt = cur->next;
             delete cur;
             cur = nxt;
         }
-        delete head;
         head = nullptr;
         list_size = 0;
     }
@@ -114,21 +111,13 @@ public:
     void put(std::string str, T value) {
         int code = GetHashCode(str);
         if (!head) return;
-        Node* cur = head;
         // If code <= head bound, store at head
         if (code <= head->bound) {
-            cur->kv_map[str] = value;
+            head->kv_map[str] = value;
             return;
         }
-        // Traverse until find node with bound >= code and previous bound < code
-        while (!(code <= cur->bound && code > cur->next->bound ? false : true)) {
-            // The above condition is tricky; better do simple monotonic traversal
-            if (code <= cur->bound) break;
-            cur = cur->next;
-            if (cur == head) break; // safety
-        }
-        // Simple linear traversal: find first bound >= code
-        cur = head->next;
+        // Simple linear traversal: find first bound >= code starting from head->next
+        Node* cur = head->next;
         while (cur != head && cur->bound < code) cur = cur->next;
         if (cur->bound >= code) {
             cur->kv_map[str] = value;
@@ -168,4 +157,3 @@ public:
     int size() const { return list_size; }
 };
 #endif // SPEEDCIRCULARLIST_H
-
